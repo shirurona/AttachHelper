@@ -1,1 +1,4 @@
-# Attach-Helper
+# AttachHelper
+UnityでUnassignedReferenceExceptionを未然に防ぐためのエディタ拡張
+
+参照がNoneになっているものが追加された際にウインドウが出現してアタッチする必要があるものを教えてくれます。
