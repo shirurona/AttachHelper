@@ -72,12 +72,23 @@ namespace AttachHelper.Editor
         [InitializeOnLoadMethod]
         private static void Initialize()
         {
+            Debug.Log("a");
             RestoreData();
             RegisterSerializeNone();
-            if (!show.Any()) return;
-        
+            
+            if (!IsShowAny()) return;
             AttachHelper window = GetWindow<AttachHelper>();
             window.ShowPopup();
+        }
+
+        static bool IsShowAny()
+        {
+            foreach (UniqueProperty serializedObj in show)
+            {
+                if (ignores.Contains(serializedObj)) continue;
+                return true;
+            }
+            return false;
         }
     
         [MenuItem("AttachHelper/Check")]
@@ -85,8 +96,6 @@ namespace AttachHelper.Editor
         {
             RestoreData();
             RegisterSerializeNone();
-            if (!show.Any()) return;
-        
             AttachHelper window = GetWindow<AttachHelper>();
             window.Show();
         }
@@ -140,7 +149,7 @@ namespace AttachHelper.Editor
                         if (serializedProp.propertyType != SerializedPropertyType.ObjectReference) continue;
                         if (serializedProp.objectReferenceValue != null) continue;
                         if (showcomp.ContainsKey(uniqueProperty)) continue;
-                    
+                        
                         show.Add(uniqueProperty);
                         showcomp.Add(uniqueProperty, obj);
                     }
