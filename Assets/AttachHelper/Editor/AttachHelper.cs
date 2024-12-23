@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -14,7 +15,7 @@ namespace AttachHelper.Editor
             {
                 if (ReferenceEquals(x, null)) return false;
                 if (ReferenceEquals(y, null)) return false;
-                return Equals(x.index, y.index) && Equals(x.propertyPath, y.propertyPath);
+                return Equals(x.index, y.index) && Equals(x.propertyPath, y.propertyPath) && Equals(x.sceneName, y.sceneName);
             }
             
             public int GetHashCode(UniquePropertyInfo obj)
@@ -39,6 +40,7 @@ namespace AttachHelper.Editor
         {
             public int index;
             public string propertyPath;
+            public string sceneName;
         
             public UniquePropertyInfo(Component component, SerializedProperty serializedProperty)
             {
@@ -52,12 +54,14 @@ namespace AttachHelper.Editor
                     }
                 }
                 propertyPath = serializedProperty.propertyPath;
+                sceneName = SceneManager.GetActiveScene().name;
             }
         
-            public UniquePropertyInfo(int index, string propertyPath)
+            public UniquePropertyInfo(int index, string propertyPath, string sceneName)
             {
                 this.index = index;
                 this.propertyPath = propertyPath;
+                this.sceneName = sceneName;
             }
         }
     
@@ -79,6 +83,11 @@ namespace AttachHelper.Editor
         [InitializeOnLoadMethod]
         private static void Initialize()
         {
+            EditorSceneManager.sceneOpened += (_, _) =>
+            {
+                show.Clear();
+                showcomp.Clear();
+            };
             RestoreData();
             RegisterSerializeNone();
             
@@ -126,6 +135,7 @@ namespace AttachHelper.Editor
             {
                 EditorUserSettings.SetConfigValue($"propertyPath{i}", null);
                 EditorUserSettings.SetConfigValue($"index{i}", null);
+                EditorUserSettings.SetConfigValue($"sceneName{i}", null);
             }
             EditorUserSettings.SetConfigValue("ignoreCount", null);
         }
@@ -142,7 +152,8 @@ namespace AttachHelper.Editor
             {
                 string propertyPath = EditorUserSettings.GetConfigValue($"propertyPath{i}");
                 int index = int.Parse(EditorUserSettings.GetConfigValue($"index{i}"));
-                ignores.Add(new UniquePropertyInfo(index, propertyPath));
+                string sceneName = EditorUserSettings.GetConfigValue($"sceneName{i}");
+                ignores.Add(new UniquePropertyInfo(index, propertyPath, sceneName));
             }
         }
         
@@ -153,6 +164,7 @@ namespace AttachHelper.Editor
             int ignoreCount = int.Parse(EditorUserSettings.GetConfigValue("ignoreCount"));
             EditorUserSettings.SetConfigValue($"propertyPath{ignoreCount}", uniquePropertyInfo.propertyPath);
             EditorUserSettings.SetConfigValue($"index{ignoreCount}", uniquePropertyInfo.index.ToString());
+            EditorUserSettings.SetConfigValue($"sceneName{ignoreCount}", uniquePropertyInfo.sceneName);
             EditorUserSettings.SetConfigValue("ignoreCount", (ignoreCount + 1).ToString());
         }
     
