@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -9,16 +8,15 @@ namespace AttachHelper.Editor
 {
     public class AttachHelper : EditorWindow
     {
-        public class PropertyCompararer : IEqualityComparer<UniquePropertyInfo>
+        public class PropertyComparer : IEqualityComparer<UniquePropertyInfo>
         {
             public bool Equals(UniquePropertyInfo x, UniquePropertyInfo y)
             {
                 if (ReferenceEquals(x, null)) return false;
                 if (ReferenceEquals(y, null)) return false;
-                if (x.GetType() != y.GetType()) return false;
                 return Equals(x.index, y.index) && Equals(x.propertyPath, y.propertyPath);
             }
-        
+            
             public int GetHashCode(UniquePropertyInfo obj)
             {
                 return HashCode.Combine(obj.index, obj.propertyPath);
@@ -71,12 +69,12 @@ namespace AttachHelper.Editor
         /// <summary>
         /// showに登録されたやつを検索するためのやつ
         /// </summary>
-        private static HashSet<UniquePropertyInfo> showcomp = new HashSet<UniquePropertyInfo>(new PropertyCompararer());
+        private static HashSet<UniquePropertyInfo> showcomp = new HashSet<UniquePropertyInfo>(new PropertyComparer());
     
         /// <summary>
         /// Noneだけどそれでいいから無視するやつ。Noneじゃなくなってもそのまま。
         /// </summary>
-        private static HashSet<UniquePropertyInfo> ignores = new HashSet<UniquePropertyInfo>(new PropertyCompararer());
+        private static HashSet<UniquePropertyInfo> ignores = new HashSet<UniquePropertyInfo>(new PropertyComparer());
     
         [InitializeOnLoadMethod]
         private static void Initialize()
@@ -114,11 +112,27 @@ namespace AttachHelper.Editor
             show.Clear();
             showcomp.Clear();
             ignores.Clear();
+            ClearData();
+        }
+
+        private static void ClearData()
+        {
+            if (string.IsNullOrEmpty(EditorUserSettings.GetConfigValue("ignoreCount")))
+            {
+                return;
+            }
+            int ignoreCount = int.Parse(EditorUserSettings.GetConfigValue("ignoreCount"));
+            for (int i = 0; i < ignoreCount; i++)
+            {
+                EditorUserSettings.SetConfigValue($"propertyPath{i}", null);
+                EditorUserSettings.SetConfigValue($"index{i}", null);
+            }
+            EditorUserSettings.SetConfigValue("ignoreCount", null);
         }
     
         private static void RestoreData()
         {
-            if (EditorUserSettings.GetConfigValue("ignoreCount") is null)
+            if (string.IsNullOrEmpty(EditorUserSettings.GetConfigValue("ignoreCount")))
             {
                 EditorUserSettings.SetConfigValue("ignoreCount", "0");
             }
