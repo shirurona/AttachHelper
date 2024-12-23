@@ -9,9 +9,9 @@ namespace AttachHelper.Editor
 {
     public class AttachHelper : EditorWindow
     {
-        public class PropertyCompararer : IEqualityComparer<UniqueProperty>
+        public class PropertyCompararer : IEqualityComparer<UniquePropertyInfo>
         {
-            public bool Equals(UniqueProperty x, UniqueProperty y)
+            public bool Equals(UniquePropertyInfo x, UniquePropertyInfo y)
             {
                 if (ReferenceEquals(x, null)) return false;
                 if (ReferenceEquals(y, null)) return false;
@@ -19,19 +19,30 @@ namespace AttachHelper.Editor
                 return Equals(x.index, y.index) && Equals(x.propertyPath, y.propertyPath);
             }
         
-            public int GetHashCode(UniqueProperty obj)
+            public int GetHashCode(UniquePropertyInfo obj)
             {
                 return HashCode.Combine(obj.index, obj.propertyPath);
             }
         }
+        
+        public class UniqueProperty : UniquePropertyInfo
+        {
+            public SerializedProperty SerializedProperty;
+            public GameObject GameObject;
+        
+            public UniqueProperty(Component component, SerializedProperty serializedProperty) : base(component, serializedProperty)
+            {
+                SerializedProperty = serializedProperty.Copy();
+                GameObject = component.gameObject;
+            }
+        }
     
-        public class UniqueProperty
+        public class UniquePropertyInfo
         {
             public int index;
-            public SerializedProperty SerializedProperty;
             public string propertyPath;
         
-            public UniqueProperty(Component component, SerializedProperty serializedProperty)
+            public UniquePropertyInfo(Component component, SerializedProperty serializedProperty)
             {
                 var components = component.GetComponents<Component>();
                 for (int i = 0; i < components.Length; i++)
@@ -42,12 +53,10 @@ namespace AttachHelper.Editor
                         break;
                     }
                 }
-            
-                SerializedProperty = serializedProperty.Copy();
                 propertyPath = serializedProperty.propertyPath;
             }
         
-            public UniqueProperty(int index, string propertyPath)
+            public UniquePropertyInfo(int index, string propertyPath)
             {
                 this.index = index;
                 this.propertyPath = propertyPath;
@@ -62,17 +71,16 @@ namespace AttachHelper.Editor
         /// <summary>
         /// showに登録されたやつを検索するためのやつ
         /// </summary>
-        private static Dictionary<UniqueProperty, GameObject> showcomp = new Dictionary<UniqueProperty, GameObject>(new PropertyCompararer());
+        private static HashSet<UniquePropertyInfo> showcomp = new HashSet<UniquePropertyInfo>(new PropertyCompararer());
     
         /// <summary>
         /// Noneだけどそれでいいから無視するやつ。Noneじゃなくなってもそのまま。
         /// </summary>
-        private static HashSet<UniqueProperty> ignores = new HashSet<UniqueProperty>(new PropertyCompararer());
+        private static HashSet<UniquePropertyInfo> ignores = new HashSet<UniquePropertyInfo>(new PropertyCompararer());
     
         [InitializeOnLoadMethod]
         private static void Initialize()
         {
-            Debug.Log("a");
             RestoreData();
             RegisterSerializeNone();
             
@@ -108,7 +116,7 @@ namespace AttachHelper.Editor
             ignores.Clear();
         }
     
-        static void RestoreData()
+        private static void RestoreData()
         {
             if (EditorUserSettings.GetConfigValue("ignoreCount") is null)
             {
@@ -120,8 +128,18 @@ namespace AttachHelper.Editor
             {
                 string propertyPath = EditorUserSettings.GetConfigValue($"propertyPath{i}");
                 int index = int.Parse(EditorUserSettings.GetConfigValue($"index{i}"));
-                ignores.Add(new UniqueProperty(index, propertyPath));
+                ignores.Add(new UniquePropertyInfo(index, propertyPath));
             }
+        }
+        
+        private static void AddIgnore(UniquePropertyInfo uniquePropertyInfo)
+        {
+            ignores.Add(uniquePropertyInfo);
+        
+            int ignoreCount = int.Parse(EditorUserSettings.GetConfigValue("ignoreCount"));
+            EditorUserSettings.SetConfigValue($"propertyPath{ignoreCount}", uniquePropertyInfo.propertyPath);
+            EditorUserSettings.SetConfigValue($"index{ignoreCount}", uniquePropertyInfo.index.ToString());
+            EditorUserSettings.SetConfigValue("ignoreCount", (ignoreCount + 1).ToString());
         }
     
         static void RegisterSerializeNone()
@@ -148,12 +166,21 @@ namespace AttachHelper.Editor
                         var uniqueProperty = new UniqueProperty(component, serializedProp);
                         if (serializedProp.propertyType != SerializedPropertyType.ObjectReference) continue;
                         if (serializedProp.objectReferenceValue != null) continue;
-                        if (showcomp.ContainsKey(uniqueProperty)) continue;
+                        if (showcomp.Contains(uniqueProperty)) continue;
                         
                         show.Add(uniqueProperty);
-                        showcomp.Add(uniqueProperty, obj);
+                        showcomp.Add(uniqueProperty);
                     }
                 }
+            }
+        }
+        
+        private static void FindRecursive(ref List<GameObject> list, GameObject root)
+        {
+            list.Add(root);
+            foreach (Transform child in root.transform)
+            {
+                FindRecursive(ref list, child.gameObject);
             }
         }
     
@@ -169,9 +196,9 @@ namespace AttachHelper.Editor
                 {
                     if (GUILayout.Button("Inspect", GUILayout.Width(100)))
                     {
-                        Selection.activeGameObject = showcomp[serializedObj];
+                        Selection.activeGameObject = serializedObj.GameObject;
                     }
-                    GUILayout.Label($"{showcomp[serializedObj].name} > {showcomp[serializedObj].GetComponents<Component>()[serializedObj.index].GetType()} > {serializedProp.displayName}", GUILayout.ExpandWidth(true));
+                    GUILayout.Label($"{serializedObj.GameObject.name} > {serializedObj.GameObject.GetComponents<Component>()[serializedObj.index].GetType()} > {serializedProp.displayName}", GUILayout.ExpandWidth(true));
                     EditorGUILayout.PropertyField(serializedProp, new GUIContent(GUIContent.none), true, GUILayout.MinWidth(55), GUILayout.ExpandWidth(false));
                     serializedProp.serializedObject.ApplyModifiedProperties();
                     if (GUILayout.Button("Decide", GUILayout.Width(100)))
@@ -222,25 +249,6 @@ namespace AttachHelper.Editor
                 }
             
                 AssetDatabase.SaveAssets();
-            }
-        }
-    
-        private static void AddIgnore(UniqueProperty uniqueProperty)
-        {
-            ignores.Add(uniqueProperty);
-        
-            int ignoreCount = int.Parse(EditorUserSettings.GetConfigValue("ignoreCount"));
-            EditorUserSettings.SetConfigValue($"propertyPath{ignoreCount}", uniqueProperty.propertyPath);
-            EditorUserSettings.SetConfigValue($"index{ignoreCount}", uniqueProperty.index.ToString());
-            EditorUserSettings.SetConfigValue("ignoreCount", (ignoreCount + 1).ToString());
-        }
-    
-        private static void FindRecursive(ref List<GameObject> list, GameObject root)
-        {
-            list.Add(root);
-            foreach (Transform child in root.transform)
-            {
-                FindRecursive(ref list, child.gameObject);
             }
         }
     }
