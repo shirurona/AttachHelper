@@ -267,6 +267,7 @@ namespace AttachHelper.Editor
                 foreach (var serializedObj in show)
                 {
                     if (ignores.Contains(serializedObj)) continue;
+                    if (serializedObj.GameObject == null) continue;
                     var serializedProp = serializedObj.SerializedProperty;
 
                     using (new EditorGUILayout.HorizontalScope())
@@ -276,13 +277,10 @@ namespace AttachHelper.Editor
                             Selection.activeGameObject = serializedObj.GameObject;
                         }
 
-                        GUILayout.Label(
-                            $"{serializedObj.GameObject.name} > {serializedObj.GameObject.GetComponents<Component>()[serializedObj.index].GetType()} > {serializedProp.displayName}",
-                            GUILayout.MinWidth(200));
+                        GUILayout.Label($"{serializedObj.GameObject.name} > {serializedObj.GameObject.GetComponents<Component>()[serializedObj.index].GetType()} > {serializedProp.displayName}", GUILayout.MinWidth(200));
 
                         GUILayout.FlexibleSpace();
-                        EditorGUILayout.PropertyField(serializedProp, new GUIContent(GUIContent.none), true,
-                            GUILayout.MinWidth(150), GUILayout.MaxWidth(200), GUILayout.ExpandWidth(false));
+                        EditorGUILayout.PropertyField(serializedProp, new GUIContent(GUIContent.none), true, GUILayout.MinWidth(150), GUILayout.MaxWidth(200), GUILayout.ExpandWidth(false));
                         serializedProp.serializedObject.ApplyModifiedProperties();
                         if (GUILayout.Button("Decide", GUILayout.Width(100)))
                         {
