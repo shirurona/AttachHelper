@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -15,12 +16,12 @@ namespace AttachHelper.Editor
             {
                 if (ReferenceEquals(x, null)) return false;
                 if (ReferenceEquals(y, null)) return false;
-                return Equals(x.index, y.index) && Equals(x.propertyPath, y.propertyPath) && Equals(x.sceneName, y.sceneName);
+                return Equals(x.index, y.index) && Equals(x.propertyPath, y.propertyPath) && Equals(x.sceneName, y.sceneName) && Equals(x.GetHierarchy(), y.GetHierarchy());
             }
             
             public int GetHashCode(UniquePropertyInfo obj)
             {
-                return HashCode.Combine(obj.index, obj.propertyPath);
+                return HashCode.Combine(obj.index, obj.propertyPath, obj.sceneName, obj.GetHierarchy());
             }
         }
         
@@ -41,6 +42,7 @@ namespace AttachHelper.Editor
             public int index;
             public string propertyPath;
             public string sceneName;
+            public List<string> objNames;
         
             public UniquePropertyInfo(Component component, SerializedProperty serializedProperty)
             {
@@ -53,15 +55,42 @@ namespace AttachHelper.Editor
                         break;
                     }
                 }
+                objNames = new List<string>();
+                AddRecursiveParent(component.transform);
                 propertyPath = serializedProperty.propertyPath;
                 sceneName = SceneManager.GetActiveScene().name;
             }
         
-            public UniquePropertyInfo(int index, string propertyPath, string sceneName)
+            public UniquePropertyInfo(int index, string propertyPath, string sceneName, string hierarchy)
             {
                 this.index = index;
                 this.propertyPath = propertyPath;
                 this.sceneName = sceneName;
+                objNames = new List<string>();
+                foreach (string objName in hierarchy.Split(" > "))
+                {
+                    objNames.Add(objName);
+                }
+            }
+            
+            private void AddRecursiveParent(Transform transform)
+            {
+                if (transform is null) return;
+                
+                objNames.Add(transform.name);
+                AddRecursiveParent(transform.parent);
+            }
+
+            public string GetHierarchy()
+            {
+                StringBuilder stringBuilder = new StringBuilder();
+                for (int i = 0; i < objNames.Count - 1; i++)
+                {
+                    stringBuilder.Append(objNames[i]);
+                    stringBuilder.Append(" > ");
+                }
+                stringBuilder.Append(objNames[^1]);
+                return stringBuilder.ToString();
             }
         }
     
@@ -92,6 +121,7 @@ namespace AttachHelper.Editor
                 RestoreData();
                 RegisterSerializeNone();
             };
+            
             RestoreData();
             RegisterSerializeNone();
             
@@ -152,6 +182,7 @@ namespace AttachHelper.Editor
                 EditorUserSettings.SetConfigValue($"propertyPath{i}", null);
                 EditorUserSettings.SetConfigValue($"index{i}", null);
                 EditorUserSettings.SetConfigValue($"sceneName{i}", null);
+                EditorUserSettings.SetConfigValue($"hierarchy{i}", null);
             }
             EditorUserSettings.SetConfigValue("ignoreCount", null);
         }
@@ -169,7 +200,8 @@ namespace AttachHelper.Editor
                 string propertyPath = EditorUserSettings.GetConfigValue($"propertyPath{i}");
                 int index = int.Parse(EditorUserSettings.GetConfigValue($"index{i}"));
                 string sceneName = EditorUserSettings.GetConfigValue($"sceneName{i}");
-                ignores.Add(new UniquePropertyInfo(index, propertyPath, sceneName));
+                string hierarchy = EditorUserSettings.GetConfigValue($"hierarchy{i}");
+                ignores.Add(new UniquePropertyInfo(index, propertyPath, sceneName, hierarchy));
             }
         }
         
@@ -181,6 +213,7 @@ namespace AttachHelper.Editor
             EditorUserSettings.SetConfigValue($"propertyPath{ignoreCount}", uniquePropertyInfo.propertyPath);
             EditorUserSettings.SetConfigValue($"index{ignoreCount}", uniquePropertyInfo.index.ToString());
             EditorUserSettings.SetConfigValue($"sceneName{ignoreCount}", uniquePropertyInfo.sceneName);
+            EditorUserSettings.SetConfigValue($"hierarchy{ignoreCount}", uniquePropertyInfo.GetHierarchy());
             EditorUserSettings.SetConfigValue("ignoreCount", (ignoreCount + 1).ToString());
         }
     
@@ -289,7 +322,7 @@ namespace AttachHelper.Editor
                 }
             }
         
-            if (GUILayout.Button("Decide All"))
+            if (GUILayout.Button("Decide All", GUILayout.Height(40)))
             {
                 foreach (var serializedObj in show)
                 {
@@ -299,6 +332,11 @@ namespace AttachHelper.Editor
                 }
             
                 AssetDatabase.SaveAssets();
+            }
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Close"))
+            {
+                Close();
             }
         }
     }
