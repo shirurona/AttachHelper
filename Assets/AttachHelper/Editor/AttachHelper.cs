@@ -79,6 +79,8 @@ namespace AttachHelper.Editor
         /// Noneだけどそれでいいから無視するやつ。Noneじゃなくなってもそのまま。
         /// </summary>
         private static HashSet<UniquePropertyInfo> ignores = new HashSet<UniquePropertyInfo>(new PropertyComparer());
+
+        private Vector2 scrollPosition = Vector2.zero;
     
         [InitializeOnLoadMethod]
         private static void Initialize()
@@ -87,13 +89,21 @@ namespace AttachHelper.Editor
             {
                 show.Clear();
                 showcomp.Clear();
+                RestoreData();
+                RegisterSerializeNone();
             };
             RestoreData();
             RegisterSerializeNone();
             
-            if (!IsShowAny()) return;
-            AttachHelper window = GetWindow<AttachHelper>();
-            window.ShowPopup();
+            if (HasOpenInstances<AttachHelper>()) {
+                FocusWindowIfItsOpen<AttachHelper>();
+            }
+            else
+            {
+                if (!IsShowAny()) return;
+                AttachHelper window = GetWindow<AttachHelper>();
+                window.Show();
+            }
         }
 
         static bool IsShowAny()
@@ -111,8 +121,14 @@ namespace AttachHelper.Editor
         {
             RestoreData();
             RegisterSerializeNone();
-            AttachHelper window = GetWindow<AttachHelper>();
-            window.Show();
+            if (HasOpenInstances<AttachHelper>()) {
+                FocusWindowIfItsOpen<AttachHelper>();
+            }
+            else
+            {
+                AttachHelper window = GetWindow<AttachHelper>();
+                window.Show();
+            }
         }
     
         [MenuItem("AttachHelper/Reset")]
@@ -212,29 +228,37 @@ namespace AttachHelper.Editor
     
         void OnGUI()
         {
-            EditorGUILayout.BeginScrollView(Vector2.zero, false, false);
-            foreach (var serializedObj in show)
+            using (var scrollViewScope = new EditorGUILayout.ScrollViewScope(scrollPosition, false, false))
             {
-                if (ignores.Contains(serializedObj)) continue;
-                var serializedProp = serializedObj.SerializedProperty;
-            
-                using (new EditorGUILayout.HorizontalScope())
+                scrollPosition = scrollViewScope.scrollPosition;
+                foreach (var serializedObj in show)
                 {
-                    if (GUILayout.Button("Inspect", GUILayout.Width(100)))
+                    if (ignores.Contains(serializedObj)) continue;
+                    var serializedProp = serializedObj.SerializedProperty;
+
+                    using (new EditorGUILayout.HorizontalScope())
                     {
-                        Selection.activeGameObject = serializedObj.GameObject;
-                    }
-                    GUILayout.Label($"{serializedObj.GameObject.name} > {serializedObj.GameObject.GetComponents<Component>()[serializedObj.index].GetType()} > {serializedProp.displayName}", GUILayout.ExpandWidth(true));
-                    EditorGUILayout.PropertyField(serializedProp, new GUIContent(GUIContent.none), true, GUILayout.MinWidth(55), GUILayout.ExpandWidth(false));
-                    serializedProp.serializedObject.ApplyModifiedProperties();
-                    if (GUILayout.Button("Decide", GUILayout.Width(100)))
-                    {
-                        AddIgnore(serializedObj);
-                        AssetDatabase.SaveAssets();
+                        if (GUILayout.Button("Inspect", GUILayout.Width(100)))
+                        {
+                            Selection.activeGameObject = serializedObj.GameObject;
+                        }
+
+                        GUILayout.Label(
+                            $"{serializedObj.GameObject.name} > {serializedObj.GameObject.GetComponents<Component>()[serializedObj.index].GetType()} > {serializedProp.displayName}",
+                            GUILayout.MinWidth(200));
+
+                        GUILayout.FlexibleSpace();
+                        EditorGUILayout.PropertyField(serializedProp, new GUIContent(GUIContent.none), true,
+                            GUILayout.MinWidth(150), GUILayout.MaxWidth(200), GUILayout.ExpandWidth(false));
+                        serializedProp.serializedObject.ApplyModifiedProperties();
+                        if (GUILayout.Button("Decide", GUILayout.Width(100)))
+                        {
+                            AddIgnore(serializedObj);
+                            AssetDatabase.SaveAssets();
+                        }
                     }
                 }
             }
-            EditorGUILayout.EndScrollView();
         
             using (new EditorGUILayout.HorizontalScope())
             {
