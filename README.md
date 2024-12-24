@@ -5,6 +5,8 @@ UnityでUnassignedReferenceExceptionを未然に防ぐためのエディタ拡�
 
 <img src="https://github.com/user-attachments/assets/d2088b02-e209-4733-83e2-a3a15ce90a03" width="50%">
 
+表示されているプロパティに参照が設定されると、シーン上のオブジェクトに参照が即時反映されます。
+
 Inspectボタンで参照がNoneになっているものを選択してインスペクターウインドウに表示できます。
 
 Decideボタンで参照の状態が確定されたとみなして次からウインドウに表示しないようにできます。
