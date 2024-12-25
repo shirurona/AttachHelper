@@ -29,18 +29,18 @@ namespace AttachHelper.Editor
         }
         public class UniqueProperty : UniquePropertyInfo
         {
-            public SerializedProperty Property;
+            public SerializedProperty SerializedProperty { get; }
         
             public UniqueProperty(string globalObjectIdString, SerializedProperty property) : base(globalObjectIdString, property.propertyPath)
             {
-                Property = property.Copy();
+                SerializedProperty = property.Copy();
             }
         }
 
         public class UniquePropertyInfo
         {
-            public string GlobalObjectIdString;
-            public string PropertyPath;
+            public string GlobalObjectIdString { get; }
+            public string PropertyPath { get; }
         
             public UniquePropertyInfo(string globalObjectIdString, string propertyPath)
             {
@@ -64,7 +64,7 @@ namespace AttachHelper.Editor
         /// </summary>
         private static HashSet<UniquePropertyInfo> ignores = new HashSet<UniquePropertyInfo>(new PropertyComparer());
 
-        private Vector2 scrollPosition = Vector2.zero;
+        private Vector2 _scrollPosition = Vector2.zero;
     
         [InitializeOnLoadMethod]
         private static void Initialize()
@@ -212,45 +212,59 @@ namespace AttachHelper.Editor
     
         void OnGUI()
         {
-            using (var scrollViewScope = new EditorGUILayout.ScrollViewScope(scrollPosition, false, false))
+            using (var scrollViewScope = new EditorGUILayout.ScrollViewScope(_scrollPosition, false, false))
             {
-                scrollPosition = scrollViewScope.scrollPosition;
+                _scrollPosition = scrollViewScope.scrollPosition;
+                List<UniqueProperty> uniqueProperties = new List<UniqueProperty>();
+                List<GlobalObjectId> globalObjectIdList = new List<GlobalObjectId>();
                 foreach (var serializedObj in show)
                 {
                     if (ignores.Contains(serializedObj)) continue;
+
+                    uniqueProperties.Add(serializedObj);
                     if (GlobalObjectId.TryParse(serializedObj.GlobalObjectIdString, out GlobalObjectId globalObjectId))
                     {
-                        var obj = GlobalObjectId.GlobalObjectIdentifierToObjectSlow(globalObjectId);
-                        if (obj == null)
+                        globalObjectIdList.Add(globalObjectId);
+                    }
+                }
+                var objs = new UnityEngine.Object[globalObjectIdList.Count];
+                GlobalObjectId.GlobalObjectIdentifiersToObjectsSlow(globalObjectIdList.ToArray(), objs);
+                
+                for (int i = 0; i < uniqueProperties.Count; i++)
+                {
+                    var serializedObj = uniqueProperties[i];
+                    if (objs[i] == null)
+                    {
+                        ignores.Remove(serializedObj);
+                        continue;
+                    }
+                    
+                    var serializedProp = serializedObj.SerializedProperty;
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        Component component = objs[i] as Component;
+                        if (component is null)
                         {
-                            ignores.Remove(serializedObj);
-                            continue;
+                            throw new NullReferenceException();
                         }
-                        var serializedProp = serializedObj.Property;
-                        using (new EditorGUILayout.HorizontalScope())
+
+                        GameObject gameObj = component.gameObject;
+                        if (GUILayout.Button("Inspect", GUILayout.Width(100)))
                         {
-                            Component component = obj as Component;
-                            if (component is null)
-                            {
-                                throw new NullReferenceException();
-                            }
-                            GameObject gameObj = component.gameObject;
-                            if (GUILayout.Button("Inspect", GUILayout.Width(100)))
-                            {
-                                Selection.activeGameObject = gameObj;
-                            }
+                            Selection.activeGameObject = gameObj;
+                        }
 
-                            GUILayout.Label($"{gameObj.name} > {component.GetType()} > {serializedProp.displayName}", GUILayout.MinWidth(200));
+                        GUILayout.Label($"{gameObj.name} > {component.GetType()} > {serializedProp.displayName}",
+                            GUILayout.MinWidth(200));
 
-                            GUILayout.FlexibleSpace();
-                            EditorGUILayout.PropertyField(serializedProp, new GUIContent(GUIContent.none), true,
-                                GUILayout.MinWidth(150), GUILayout.MaxWidth(200), GUILayout.ExpandWidth(false));
-                            serializedProp.serializedObject.ApplyModifiedProperties();
-                            if (GUILayout.Button("Decide", GUILayout.Width(100)))
-                            {
-                                AddIgnore(serializedObj);
-                                AssetDatabase.SaveAssets();
-                            }
+                        GUILayout.FlexibleSpace();
+                        EditorGUILayout.PropertyField(serializedProp, new GUIContent(GUIContent.none), true,
+                            GUILayout.MinWidth(150), GUILayout.MaxWidth(200), GUILayout.ExpandWidth(false));
+                        serializedProp.serializedObject.ApplyModifiedProperties();
+                        if (GUILayout.Button("Decide", GUILayout.Width(100)))
+                        {
+                            AddIgnore(serializedObj);
+                            AssetDatabase.SaveAssets();
                         }
                     }
                 }
@@ -263,7 +277,7 @@ namespace AttachHelper.Editor
                     foreach (var serializedObj in show)
                     {
                         if (ignores.Contains(serializedObj)) continue;
-                        var serializedProp = serializedObj.Property;
+                        var serializedProp = serializedObj.SerializedProperty;
                         if (serializedProp.objectReferenceValue != null) continue;
                         AddIgnore(serializedObj);
                     }
@@ -276,7 +290,7 @@ namespace AttachHelper.Editor
                     foreach (var serializedObj in show)
                     {
                         if (ignores.Contains(serializedObj)) continue;
-                        var serializedProp = serializedObj.Property;
+                        var serializedProp = serializedObj.SerializedProperty;
                         if (serializedProp.objectReferenceValue == null) continue;
                         AddIgnore(serializedObj);
                     }
