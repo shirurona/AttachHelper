@@ -9,15 +9,43 @@ namespace AttachHelper.Editor
 {
     public class AttachHelper : EditorWindow
     {
-        public class UniqueProperty
+        public class PropertyComparer : IEqualityComparer<UniquePropertyInfo>
         {
-            public string GlobalObjectIdString;
+            public bool Equals(UniquePropertyInfo x, UniquePropertyInfo y)
+            {
+                if (ReferenceEquals(x, y)) return true;
+                if (ReferenceEquals(x, null)) return false;
+                if (ReferenceEquals(y, null)) return false;
+                return x.GlobalObjectIdString.Equals(y.GlobalObjectIdString) && x.PropertyPath.Equals(y.PropertyPath);
+            }
+
+            public int GetHashCode(UniquePropertyInfo obj)
+            {
+                unchecked
+                {
+                    return ((obj.GlobalObjectIdString != null ? obj.GlobalObjectIdString.GetHashCode() : 0) * 397) ^ (obj.PropertyPath != null ? obj.PropertyPath.GetHashCode() : 0);
+                }
+            }
+        }
+        public class UniqueProperty : UniquePropertyInfo
+        {
             public SerializedProperty Property;
         
-            public UniqueProperty(string globalObjectIdString, SerializedProperty property)
+            public UniqueProperty(string globalObjectIdString, SerializedProperty property) : base(globalObjectIdString, property.propertyPath)
+            {
+                Property = property.Copy();
+            }
+        }
+
+        public class UniquePropertyInfo
+        {
+            public string GlobalObjectIdString;
+            public string PropertyPath;
+        
+            public UniquePropertyInfo(string globalObjectIdString, string propertyPath)
             {
                 GlobalObjectIdString = globalObjectIdString;
-                Property = property.Copy();
+                PropertyPath = propertyPath;
             }
         }
     
@@ -29,12 +57,12 @@ namespace AttachHelper.Editor
         /// <summary>
         /// showに登録されたやつを検索するためのやつ
         /// </summary>
-        private static HashSet<string> showcomp = new HashSet<string>();
+        private static HashSet<UniquePropertyInfo> showcomp = new HashSet<UniquePropertyInfo>(new PropertyComparer());
     
         /// <summary>
         /// Noneだけどそれでいいから無視するやつ。Noneじゃなくなってもそのまま。
         /// </summary>
-        private static HashSet<string> ignores = new HashSet<string>();
+        private static HashSet<UniquePropertyInfo> ignores = new HashSet<UniquePropertyInfo>(new PropertyComparer());
 
         private Vector2 scrollPosition = Vector2.zero;
     
@@ -67,7 +95,7 @@ namespace AttachHelper.Editor
         {
             foreach (UniqueProperty serializedObj in show)
             {
-                if (ignores.Contains(serializedObj.GlobalObjectIdString)) continue;
+                if (ignores.Contains(serializedObj)) continue;
                 return true;
             }
             return false;
@@ -107,6 +135,7 @@ namespace AttachHelper.Editor
             for (int i = 0; i < ignoreCount; i++)
             {
                 EditorUserSettings.SetConfigValue($"globalObjectIdString{i}", null);
+                EditorUserSettings.SetConfigValue($"propertyPath{i}", null);
             }
             EditorUserSettings.SetConfigValue("ignoreCount", null);
         }
@@ -122,59 +151,62 @@ namespace AttachHelper.Editor
             for (int i = 0; i < ignoreCount; i++)
             {
                 string globalObjectId = EditorUserSettings.GetConfigValue($"globalObjectIdString{i}");
-                ignores.Add(globalObjectId);
+                string propertyPath = EditorUserSettings.GetConfigValue($"propertyPath{i}");
+                ignores.Add(new UniquePropertyInfo(globalObjectId, propertyPath));
             }
         }
         
-        private static void AddIgnore(string uniquePropertyInfo)
+        private static void AddIgnore(UniquePropertyInfo uniquePropertyInfo)
         {
             ignores.Add(uniquePropertyInfo);
         
             int ignoreCount = int.Parse(EditorUserSettings.GetConfigValue("ignoreCount"));
-            EditorUserSettings.SetConfigValue($"globalObjectIdString{ignoreCount}", uniquePropertyInfo);
+            EditorUserSettings.SetConfigValue($"globalObjectIdString{ignoreCount}", uniquePropertyInfo.GlobalObjectIdString);
+            EditorUserSettings.SetConfigValue($"propertyPath{ignoreCount}", uniquePropertyInfo.PropertyPath);
             EditorUserSettings.SetConfigValue("ignoreCount", (ignoreCount + 1).ToString());
         }
     
         static void RegisterSerializeNone()
         {
-            var objs = new List<GameObject>();
             var scene = SceneManager.GetActiveScene();
             foreach (var obj in scene.GetRootGameObjects())
             {
-                FindRecursive(ref objs, obj);
-            }
-        
-            foreach (var obj in objs)
-            {
-                Component[] components = obj.GetComponents<Component>();
-                foreach (Component component in components)
-                {
-                    if (component == null) continue;
-                
-                    var serializedObj = new SerializedObject(component);
-                
-                    var serializedProp = serializedObj.GetIterator();
-                    while (serializedProp.NextVisible(true))
-                    {
-                        GlobalObjectId globalObjectId = GlobalObjectId.GetGlobalObjectIdSlow(component);
-                        string globalObjectIdString = globalObjectId.ToString();
-                        if (serializedProp.propertyType != SerializedPropertyType.ObjectReference) continue;
-                        if (serializedProp.objectReferenceValue != null) continue;
-                        if (showcomp.Contains(globalObjectIdString)) continue;
-
-                        show.Add(new UniqueProperty(globalObjectIdString, serializedProp));
-                        showcomp.Add(globalObjectIdString);
-                    }
-                }
+                FindRecursive(obj);
             }
         }
         
-        private static void FindRecursive(ref List<GameObject> list, GameObject root)
+        private static void FindRecursive(GameObject root)
         {
-            list.Add(root);
+            AddShowSerializeNone(root);
+            
             foreach (Transform child in root.transform)
             {
-                FindRecursive(ref list, child.gameObject);
+                FindRecursive(child.gameObject);
+            }
+        }
+
+        static void AddShowSerializeNone(GameObject obj)
+        {
+            Component[] components = obj.GetComponents<Component>();
+            foreach (Component component in components)
+            {
+                if (component == null) continue;
+                
+                var serializedObj = new SerializedObject(component);
+                
+                var serializedProp = serializedObj.GetIterator();
+                while (serializedProp.NextVisible(true))
+                {
+                    GlobalObjectId globalObjectId = GlobalObjectId.GetGlobalObjectIdSlow(component);
+                    string globalObjectIdString = globalObjectId.ToString();
+                    UniqueProperty uniqueProperty = new UniqueProperty(globalObjectIdString, serializedProp);
+                    if (serializedProp.propertyType != SerializedPropertyType.ObjectReference) continue;
+                    if (serializedProp.objectReferenceValue != null) continue;
+                    if (showcomp.Contains(uniqueProperty)) continue;
+
+                    show.Add(uniqueProperty);
+                    showcomp.Add(uniqueProperty);
+                }
             }
         }
     
@@ -185,11 +217,15 @@ namespace AttachHelper.Editor
                 scrollPosition = scrollViewScope.scrollPosition;
                 foreach (var serializedObj in show)
                 {
-                    if (ignores.Contains(serializedObj.GlobalObjectIdString)) continue;
+                    if (ignores.Contains(serializedObj)) continue;
                     if (GlobalObjectId.TryParse(serializedObj.GlobalObjectIdString, out GlobalObjectId globalObjectId))
                     {
                         var obj = GlobalObjectId.GlobalObjectIdentifierToObjectSlow(globalObjectId);
-                        if (obj == null) continue;
+                        if (obj == null)
+                        {
+                            ignores.Remove(serializedObj);
+                            continue;
+                        }
                         var serializedProp = serializedObj.Property;
                         using (new EditorGUILayout.HorizontalScope())
                         {
@@ -212,7 +248,7 @@ namespace AttachHelper.Editor
                             serializedProp.serializedObject.ApplyModifiedProperties();
                             if (GUILayout.Button("Decide", GUILayout.Width(100)))
                             {
-                                AddIgnore(serializedObj.GlobalObjectIdString);
+                                AddIgnore(serializedObj);
                                 AssetDatabase.SaveAssets();
                             }
                         }
@@ -226,10 +262,10 @@ namespace AttachHelper.Editor
                 {
                     foreach (var serializedObj in show)
                     {
-                        if (ignores.Contains(serializedObj.GlobalObjectIdString)) continue;
+                        if (ignores.Contains(serializedObj)) continue;
                         var serializedProp = serializedObj.Property;
                         if (serializedProp.objectReferenceValue != null) continue;
-                        AddIgnore(serializedObj.GlobalObjectIdString);
+                        AddIgnore(serializedObj);
                     }
                 
                     AssetDatabase.SaveAssets();
@@ -239,10 +275,10 @@ namespace AttachHelper.Editor
                 {
                     foreach (var serializedObj in show)
                     {
-                        if (ignores.Contains(serializedObj.GlobalObjectIdString)) continue;
+                        if (ignores.Contains(serializedObj)) continue;
                         var serializedProp = serializedObj.Property;
                         if (serializedProp.objectReferenceValue == null) continue;
-                        AddIgnore(serializedObj.GlobalObjectIdString);
+                        AddIgnore(serializedObj);
                     }
                 
                     AssetDatabase.SaveAssets();
@@ -253,9 +289,9 @@ namespace AttachHelper.Editor
             {
                 foreach (var serializedObj in show)
                 {
-                    if (ignores.Contains(serializedObj.GlobalObjectIdString)) continue;
+                    if (ignores.Contains(serializedObj)) continue;
                 
-                    AddIgnore(serializedObj.GlobalObjectIdString);
+                    AddIgnore(serializedObj);
                 }
             
                 AssetDatabase.SaveAssets();
