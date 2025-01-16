@@ -269,7 +269,6 @@ namespace AttachHelper.Editor
                     }
                 }
             }
-        
             using (new EditorGUILayout.HorizontalScope())
             {
                 if (GUILayout.Button("Decide All None"))
@@ -281,7 +280,7 @@ namespace AttachHelper.Editor
                         if (serializedProp.objectReferenceValue != null) continue;
                         AddIgnore(serializedObj);
                     }
-                
+                    
                     AssetDatabase.SaveAssets();
                 }
             
@@ -310,11 +309,18 @@ namespace AttachHelper.Editor
             
                 AssetDatabase.SaveAssets();
             }
-            GUILayout.FlexibleSpace();
             if (GUILayout.Button("Close"))
             {
                 Close();
             }
+            var rect = GUILayoutUtility.GetLastRect();
+            if (rect.position != Vector2.zero)
+            {
+                var currentPosition = position;
+                currentPosition.size = new Vector2(currentPosition.width,rect.position.y + rect.height);
+                position = currentPosition;
+            }
+            GUILayout.FlexibleSpace();
         }
     }
 }
