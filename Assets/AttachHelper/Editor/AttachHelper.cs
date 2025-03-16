@@ -209,9 +209,10 @@ namespace AttachHelper.Editor
                 }
             }
         }
-    
+
         void OnGUI()
         {
+            int scrollContentCount = 0;
             using (var scrollViewScope = new EditorGUILayout.ScrollViewScope(_scrollPosition, false, false))
             {
                 _scrollPosition = scrollViewScope.scrollPosition;
@@ -227,9 +228,10 @@ namespace AttachHelper.Editor
                         globalObjectIdList.Add(globalObjectId);
                     }
                 }
+
                 var objs = new UnityEngine.Object[globalObjectIdList.Count];
                 GlobalObjectId.GlobalObjectIdentifiersToObjectsSlow(globalObjectIdList.ToArray(), objs);
-                
+
                 for (int i = 0; i < uniqueProperties.Count; i++)
                 {
                     var serializedObj = uniqueProperties[i];
@@ -238,7 +240,8 @@ namespace AttachHelper.Editor
                         ignores.Remove(serializedObj);
                         continue;
                     }
-                    
+
+                    scrollContentCount++;
                     var serializedProp = serializedObj.SerializedProperty;
                     using (new EditorGUILayout.HorizontalScope())
                     {
@@ -269,6 +272,7 @@ namespace AttachHelper.Editor
                     }
                 }
             }
+
             using (new EditorGUILayout.HorizontalScope())
             {
                 if (GUILayout.Button("Decide All None"))
@@ -280,10 +284,10 @@ namespace AttachHelper.Editor
                         if (serializedProp.objectReferenceValue != null) continue;
                         AddIgnore(serializedObj);
                     }
-                    
+
                     AssetDatabase.SaveAssets();
                 }
-            
+
                 if (GUILayout.Button("Decide All Attached"))
                 {
                     foreach (var serializedObj in show)
@@ -293,33 +297,29 @@ namespace AttachHelper.Editor
                         if (serializedProp.objectReferenceValue == null) continue;
                         AddIgnore(serializedObj);
                     }
-                
+
                     AssetDatabase.SaveAssets();
                 }
             }
-        
+
             if (GUILayout.Button("Decide All", GUILayout.Height(40)))
             {
                 foreach (var serializedObj in show)
                 {
                     if (ignores.Contains(serializedObj)) continue;
-                
+
                     AddIgnore(serializedObj);
                 }
-            
+
                 AssetDatabase.SaveAssets();
             }
+
             if (GUILayout.Button("Close"))
             {
                 Close();
             }
-            var rect = GUILayoutUtility.GetLastRect();
-            if (rect.position != Vector2.zero)
-            {
-                var currentPosition = position;
-                currentPosition.size = new Vector2(currentPosition.width,rect.position.y + rect.height);
-                position = currentPosition;
-            }
+            minSize = new Vector2(minSize.x, 87.5f);
+            maxSize = new Vector2(maxSize.x, scrollContentCount * 21.1f + 87.5f);
             GUILayout.FlexibleSpace();
         }
     }
