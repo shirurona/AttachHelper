@@ -96,6 +96,20 @@ namespace AttachHelper.Editor
             foreach (UniqueProperty serializedObj in show)
             {
                 if (ignores.Contains(serializedObj)) continue;
+                if (GlobalObjectId.TryParse(serializedObj.GlobalObjectIdString, out GlobalObjectId parsedId))
+                {
+                    UnityEngine.Object obj = GlobalObjectId.GlobalObjectIdentifierToObjectSlow(parsedId);
+                    Component component = obj as Component;
+                    if (component is null)
+                    {
+                        throw new NullReferenceException();
+                    }
+                        
+                    // UnityでAddComponentできるものはSettingsを見て判定
+                    // ユーザー作成スクリプト（UnityEngine名前空間以外）は勝手にdictionaryを参照されて勝手にfalseをもらっては困るので上と下で分けて判定
+                    if (component.GetType().ToString().StartsWith("UnityEngine") && !AttachHelperEditorSettings.instance.GetValue(component.GetType().ToString())) continue;
+                    if (!component.GetType().ToString().StartsWith("UnityEngine") && !AttachHelperEditorSettings.instance.GetValue(AttachHelperEditorSettings.UserScriptLabel)) continue;
+                }
                 return true;
             }
             return false;
@@ -193,7 +207,6 @@ namespace AttachHelper.Editor
                 if (component == null) continue;
                 
                 var serializedObj = new SerializedObject(component);
-                
                 var serializedProp = serializedObj.GetIterator();
                 while (serializedProp.NextVisible(true))
                 {
@@ -241,7 +254,6 @@ namespace AttachHelper.Editor
                         continue;
                     }
 
-                    scrollContentCount++;
                     var serializedProp = serializedObj.SerializedProperty;
                     using (new EditorGUILayout.HorizontalScope())
                     {
@@ -250,7 +262,12 @@ namespace AttachHelper.Editor
                         {
                             throw new NullReferenceException();
                         }
-
+                        
+                        // UnityでAddComponentできるものはSettingsを見て判定
+                        // ユーザー作成スクリプト（UnityEngine名前空間以外）は勝手にdictionaryを参照されて勝手にfalseをもらっては困るので上と下で分けて判定
+                        if (!IsUserCreated(component) && !AttachHelperEditorSettings.instance.GetValue(component.GetType().ToString())) continue;
+                        if (IsUserCreated(component) && !AttachHelperEditorSettings.instance.GetValue(AttachHelperEditorSettings.UserScriptLabel)) continue;
+                        
                         GameObject gameObj = component.gameObject;
                         if (GUILayout.Button("Inspect", GUILayout.Width(100)))
                         {
@@ -269,6 +286,7 @@ namespace AttachHelper.Editor
                             AddIgnore(serializedObj);
                             AssetDatabase.SaveAssets();
                         }
+                        scrollContentCount++;
                     }
                 }
             }
@@ -321,6 +339,23 @@ namespace AttachHelper.Editor
             minSize = new Vector2(minSize.x, 87.5f);
             maxSize = new Vector2(maxSize.x, scrollContentCount * 21.1f + 87.5f);
             GUILayout.FlexibleSpace();
+        }
+
+        private static bool IsUserCreated(Component component)
+        {
+            if (component == null) return false;
+
+            MonoScript script = null;
+            if (component is MonoBehaviour mono)
+            {
+                script = MonoScript.FromMonoBehaviour(mono);
+            }
+            if (script == null) return false;
+            
+            string assetPath = AssetDatabase.GetAssetPath(script);
+            if (string.IsNullOrEmpty(assetPath)) return false;
+            
+            return assetPath.StartsWith("Assets/");
         }
     }
 }

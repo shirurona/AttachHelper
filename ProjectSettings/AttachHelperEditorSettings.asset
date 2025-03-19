@@ -1,0 +1,74 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &1
+MonoBehaviour:
+  m_ObjectHideFlags: 53
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 721441f3c64b4d842b12f6f6f7a93484, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  set:
+    m_list:
+    - key: User Created Scripts
+      value: 1
+    - key: UnityEngine.UI.Button
+      value: 0
+    - key: TMPro.TMP_Dropdown
+      value: 0
+    - key: UnityEngine.UI.Image
+      value: 0
+    - key: UnityEngine.UI.RawImage
+      value: 0
+    - key: UnityEngine.UI.ScrollRect
+      value: 0
+    - key: UnityEngine.UI.Scrollbar
+      value: 0
+    - key: UnityEngine.UI.Selectable
+      value: 0
+    - key: UnityEngine.UI.Slider
+      value: 0
+    - key: TMPro.TMP_InputField
+      value: 0
+    - key: TMPro.TextMeshProUGUI
+      value: 0
+    - key: UnityEngine.UI.Toggle
+      value: 0
+    - key: UnityEngine.UIElements.UIDocument
+      value: 0
+    - key: UnityEngine.Rendering.LensFlareComponentSRP
+      value: 0
+    - key: UnityEngine.LightAnchor
+      value: 0
+    - key: UnityEngine.Rendering.Universal.DecalProjector
+      value: 0
+    - key: Unity.AI.Navigation.NavMeshLink
+      value: 0
+    - key: Unity.AI.Navigation.NavMeshSurface
+      value: 0
+    - key: UnityEngine.Rendering.Volume
+      value: 0
+    - key: TMPro.TextMeshPro
+      value: 0
+    - key: UnityEngine.InputSystem.PlayerInput
+      value: 0
+    - key: UnityEngine.InputSystem.PlayerInputManager
+      value: 0
+    - key: UnityEngine.InputSystem.UI.VirtualMouseInput
+      value: 0
+    - key: UnityEngine.EventSystems.EventSystem
+      value: 0
+    - key: UnityEngine.Rendering.Universal.Light2D
+      value: 0
+    - key: UnityEngine.Rendering.Universal.ShadowCaster2D
+      value: 0
+    - key: UnityEngine.UI.Dropdown
+      value: 0
+    - key: UnityEngine.UI.InputField
+      value: 0
+    - key: UnityEngine.UI.Text
+      value: 0
