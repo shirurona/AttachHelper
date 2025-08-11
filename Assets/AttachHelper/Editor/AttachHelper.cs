@@ -9,46 +9,6 @@ namespace AttachHelper.Editor
 {
     public class AttachHelper : EditorWindow
     {
-        public class PropertyComparer : IEqualityComparer<UniquePropertyInfo>
-        {
-            public bool Equals(UniquePropertyInfo x, UniquePropertyInfo y)
-            {
-                if (ReferenceEquals(x, y)) return true;
-                if (ReferenceEquals(x, null)) return false;
-                if (ReferenceEquals(y, null)) return false;
-                return x.GlobalObjectIdString.Equals(y.GlobalObjectIdString) && x.PropertyPath.Equals(y.PropertyPath);
-            }
-
-            public int GetHashCode(UniquePropertyInfo obj)
-            {
-                unchecked
-                {
-                    return ((obj.GlobalObjectIdString != null ? obj.GlobalObjectIdString.GetHashCode() : 0) * 397) ^ (obj.PropertyPath != null ? obj.PropertyPath.GetHashCode() : 0);
-                }
-            }
-        }
-        public class UniqueProperty : UniquePropertyInfo
-        {
-            public SerializedProperty SerializedProperty { get; }
-        
-            public UniqueProperty(string globalObjectIdString, SerializedProperty property) : base(globalObjectIdString, property.propertyPath)
-            {
-                SerializedProperty = property.Copy();
-            }
-        }
-
-        public class UniquePropertyInfo
-        {
-            public string GlobalObjectIdString { get; }
-            public string PropertyPath { get; }
-        
-            public UniquePropertyInfo(string globalObjectIdString, string propertyPath)
-            {
-                GlobalObjectIdString = globalObjectIdString;
-                PropertyPath = propertyPath;
-            }
-        }
-    
         /// <summary>
         /// Noneなやつ
         /// </summary>
@@ -62,7 +22,7 @@ namespace AttachHelper.Editor
         /// <summary>
         /// Noneだけどそれでいいから無視するやつ。Noneじゃなくなってもそのまま。
         /// </summary>
-        private static HashSet<UniquePropertyInfo> ignores = new HashSet<UniquePropertyInfo>(new PropertyComparer());
+        private static HashSet<UniquePropertyInfo> ignores;
 
         private Vector2 _scrollPosition = Vector2.zero;
     
@@ -129,6 +89,11 @@ namespace AttachHelper.Editor
                 window.Show();
             }
         }
+
+        static void RestoreData()
+        {
+            ignores = UserSettingsDataStore.RestoreData();
+        }
     
         [MenuItem("AttachHelper/Reset")]
         public static void Clear()
@@ -136,48 +101,7 @@ namespace AttachHelper.Editor
             show.Clear();
             showcomp.Clear();
             ignores.Clear();
-            ClearData();
-        }
-
-        private static void ClearData()
-        {
-            if (string.IsNullOrEmpty(EditorUserSettings.GetConfigValue("ignoreCount")))
-            {
-                return;
-            }
-            int ignoreCount = int.Parse(EditorUserSettings.GetConfigValue("ignoreCount"));
-            for (int i = 0; i < ignoreCount; i++)
-            {
-                EditorUserSettings.SetConfigValue($"globalObjectIdString{i}", null);
-                EditorUserSettings.SetConfigValue($"propertyPath{i}", null);
-            }
-            EditorUserSettings.SetConfigValue("ignoreCount", null);
-        }
-    
-        private static void RestoreData()
-        {
-            if (string.IsNullOrEmpty(EditorUserSettings.GetConfigValue("ignoreCount")))
-            {
-                EditorUserSettings.SetConfigValue("ignoreCount", "0");
-            }
-        
-            int ignoreCount = int.Parse(EditorUserSettings.GetConfigValue("ignoreCount"));
-            for (int i = 0; i < ignoreCount; i++)
-            {
-                string globalObjectId = EditorUserSettings.GetConfigValue($"globalObjectIdString{i}");
-                string propertyPath = EditorUserSettings.GetConfigValue($"propertyPath{i}");
-                ignores.Add(new UniquePropertyInfo(globalObjectId, propertyPath));
-            }
-        }
-        
-        private static void AddIgnore(UniquePropertyInfo uniquePropertyInfo)
-        {
-            ignores.Add(uniquePropertyInfo);
-        
-            int ignoreCount = int.Parse(EditorUserSettings.GetConfigValue("ignoreCount"));
-            EditorUserSettings.SetConfigValue($"globalObjectIdString{ignoreCount}", uniquePropertyInfo.GlobalObjectIdString);
-            EditorUserSettings.SetConfigValue($"propertyPath{ignoreCount}", uniquePropertyInfo.PropertyPath);
-            EditorUserSettings.SetConfigValue("ignoreCount", (ignoreCount + 1).ToString());
+            UserSettingsDataStore.ClearData();
         }
     
         static void RegisterSerializeNone()
@@ -339,6 +263,12 @@ namespace AttachHelper.Editor
             minSize = new Vector2(minSize.x, 87.5f);
             maxSize = new Vector2(maxSize.x, scrollContentCount * 21.1f + 87.5f);
             GUILayout.FlexibleSpace();
+        }
+
+        private static void AddIgnore(UniquePropertyInfo uniquePropertyInfo)
+        {
+            ignores.Add(uniquePropertyInfo);
+            UserSettingsDataStore.AddIgnore(uniquePropertyInfo);
         }
 
         private static bool IsUserCreated(Component component)

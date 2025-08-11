@@ -15,7 +15,7 @@ MonoBehaviour:
   set:
     m_list:
     - key: User Created Scripts
-      value: 1
+      value: 0
     - key: UnityEngine.UI.Button
       value: 0
     - key: TMPro.TMP_Dropdown
